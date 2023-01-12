@@ -1,0 +1,91 @@
+#!/bin/bash
+
+mkdir -p  src inc
+
+cat > ./src/main.c << 'SAMPLEFILE'
+#include <stdio.h>
+#include "main.h"
+
+int main(int argc, char **argv)
+{
+    return 1;
+}
+SAMPLEFILE
+
+touch ./inc/main.h
+
+
+cat > Makefile << 'MAKEFILE'
+CC = gcc
+
+# Include the directoy for <*.h>
+CFLAGS=-I$(IDIR) -pthread -Wall
+
+IDIR := inc
+
+SRCDIR := src
+
+ODIR := obj
+
+# Directoy to put the executables
+BINDIR := bin
+
+APP_NAME := empty_app
+
+APP_PATH := $(BINDIR)/$(APP_NAME)
+
+# Don't show an error if the directory exists
+MKDIR_P := mkdir -p
+
+# Libraries needed
+LIBS :=
+
+# Depend from all the header files
+DEPS := $(wildcard $(IDIR)/*.h)
+
+OBJ := $(patsubst $(SRCDIR)%, $(ODIR)%, $(patsubst %.c,%.o,$(wildcard $(SRCDIR)/*.c)))
+
+all: compile_commands.json $(APP_PATH)
+
+compile_commands.json: Makefile
+	bear -- make $(APP_PATH)
+
+# Pattern rule the $< automatic variable is the first prerequisite of the target, $@ is the target's name
+# the -c option in GCC tells the compiler to not link the .o files
+$(ODIR)/%.o:$(SRCDIR)/%.c $(DEPS) | $(ODIR)
+	@echo Building $@
+	@$(CC) -c -o $@ $< $(CFLAGS)
+
+
+$(APP_PATH): $(OBJ) | $(BINDIR) $(ODIR)
+	@echo Linking everything into an executable...
+	@$(CC) -o $(APP_PATH) $(OBJ) $(CFLAGS) $(LIBS)
+	@echo Program $(APP_NAME) was succesfully built in ./$(BINDIR)
+
+
+$(BINDIR):
+	@$(MKDIR_P) $(BINDIR)
+	@echo Created ./$(BINDIR) folder
+
+$(ODIR) :
+	@$(MKDIR_P) $(ODIR)
+	@echo Created ./$(ODIR) folder
+
+# Make a phony target so that make clean would run unconditionally even if a clean file was created
+.PHONY: clean, compiledb
+
+#-r, -R, --recursive   remove directories and their contents recursively
+clean:
+	@echo Removing compiled files...
+	@rm -fr $(ODIR) $(BINDIR) compile_commands.json
+	@echo Files were succesfully removed
+MAKEFILE
+
+if ! command -v bear &> /dev/null
+then
+    echo "bear could not be found"
+    echo "This application is needed to generated compile_commands.json"
+    echo "Either modify the generated Makefile or install bear using:"
+    echo "sudo apt install bear"
+    exit
+fi
